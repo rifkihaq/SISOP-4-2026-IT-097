@@ -4,6 +4,7 @@
 ### Nama : Muhammad Salman Rifki Haq
 ### NRP  : 5027251097
 
+# Soal 1
 ---
 
 # Deskripsi Praktikum
@@ -396,3 +397,480 @@ Praktikum ini membantu memahami bagaimana Linux filesystem bekerja melalui callb
 - `read`
 
 serta memahami konsep virtual filesystem pada sistem operasi Linux.
+
+# Soal 2
+
+---
+
+# Deskripsi Praktikum
+
+Pada praktikum ini dibuat sebuah sistem database sederhana berbasis:
+
+- FUSE (Filesystem in Userspace)
+- TCP Socket Client-Server
+- Docker Container
+
+Sistem bekerja dengan alur:
+
+```text
+Client → Server → FUSE Mount → Encrypted Storage
+```
+
+Semua file database yang disimpan akan otomatis terenkripsi menggunakan metode XOR dengan key `0x76`.
+
+Keterangan:
+
+- `encrypted_storage/`
+  Folder penyimpanan file asli yang terenkripsi.
+
+- `fuse_mount/`
+  Mount point filesystem virtual.
+
+- `fuse.c`
+  Program filesystem virtual menggunakan FUSE.
+
+- `server.c`
+  Program database server berbasis TCP socket.
+
+- `client.c`
+  Program client untuk mengirim command ke server.
+
+- `Dockerfile`
+  File konfigurasi Docker.
+
+---
+
+# Penjelasan FUSE
+
+FUSE (Filesystem in Userspace) memungkinkan pembuatan filesystem virtual tanpa membuat kernel module.
+
+Pada praktikum ini FUSE digunakan untuk:
+
+- mengenkripsi file saat ditulis
+- mendekripsi file saat dibaca
+- menyembunyikan ekstensi `.enc`
+
+Contoh:
+
+```text
+fuse_mount/test.txt
+```
+
+akan disimpan menjadi:
+
+```text
+encrypted_storage/test.txt.enc
+```
+
+---
+
+# Penjelasan Program fuse.c
+
+## XOR Encryption
+
+```c
+static const unsigned char XOR_KEY = 0x76;
+```
+
+Digunakan sebagai key enkripsi dan dekripsi.
+
+---
+
+## Fungsi xor_encrypt_decrypt()
+
+```c
+void xor_encrypt_decrypt(char *buf, size_t size)
+```
+
+Fungsi ini melakukan operasi XOR pada setiap byte data.
+
+Karena XOR bersifat reversible:
+
+```text
+A XOR B XOR B = A
+```
+
+maka fungsi yang sama dapat digunakan untuk encrypt dan decrypt.
+
+---
+
+## Fungsi build_path()
+
+Digunakan untuk membangun path file asli dan menambahkan ekstensi `.enc`.
+
+Contoh:
+
+```text
+/test.txt
+```
+
+menjadi:
+
+```text
+encrypted_storage/test.txt.enc
+```
+
+---
+
+## Fungsi xmp_getattr()
+
+Digunakan untuk mengambil atribut file seperti ukuran file, permission, dan tipe file.
+
+---
+
+## Fungsi xmp_readdir()
+
+Digunakan untuk membaca isi direktori dan menyembunyikan ekstensi `.enc` dari user.
+
+---
+
+## Fungsi xmp_read()
+
+Digunakan untuk:
+
+1. membaca file terenkripsi
+2. melakukan dekripsi XOR
+3. menampilkan hasil dekripsi ke user
+
+---
+
+## Fungsi xmp_write()
+
+Digunakan untuk:
+
+1. menerima data dari user
+2. mengenkripsi data menggunakan XOR
+3. menyimpan data ke file asli
+
+---
+
+## Fungsi xmp_create()
+
+Digunakan untuk membuat file baru dengan ekstensi `.enc`.
+
+---
+
+## Fungsi main()
+
+Menjalankan filesystem FUSE menggunakan `fuse_main()`.
+
+---
+
+# Penjelasan Program server.c
+
+Program `server.c` berfungsi sebagai database server sederhana berbasis TCP socket.
+
+Server berjalan pada port:
+
+```text
+9000
+```
+
+---
+
+## Fungsi Socket
+
+```c
+socket(AF_INET, SOCK_STREAM, 0)
+```
+
+Digunakan untuk membuat TCP socket.
+
+---
+
+## Fungsi bind()
+
+```c
+bind(server_fd, ...)
+```
+
+Digunakan untuk menghubungkan server ke port 9000.
+
+---
+
+## Fungsi listen()
+
+```c
+listen(server_fd, 5)
+```
+
+Digunakan agar server dapat menerima koneksi client.
+
+---
+
+## Fungsi accept()
+
+```c
+accept(server_fd, ...)
+```
+
+Digunakan untuk menerima koneksi dari client.
+
+---
+
+## Fungsi create_database()
+
+Digunakan untuk membuat folder database.
+
+Contoh:
+
+```text
+CREATE DATABASE kampus
+```
+
+akan membuat:
+
+```text
+db/kampus/
+```
+
+---
+
+## Fungsi create_table()
+
+Digunakan untuk membuat file CSV sebagai tabel.
+
+Contoh:
+
+```text
+CREATE TABLE kampus mahasiswa
+```
+
+akan membuat:
+
+```text
+db/kampus/mahasiswa.csv
+```
+
+---
+
+## Fungsi list_database()
+
+Digunakan untuk menampilkan daftar database.
+
+---
+
+## Fungsi list_table()
+
+Digunakan untuk menampilkan daftar tabel dalam database.
+
+---
+
+# Penjelasan Program client.c
+
+Program `client.c` berfungsi sebagai client untuk mengirim command ke server.
+
+Client terhubung ke:
+
+```text
+127.0.0.1:9000
+```
+
+---
+
+## Fungsi connect()
+
+```c
+connect(sock, ...)
+```
+
+Digunakan untuk terhubung ke server.
+
+---
+
+## Fungsi send()
+
+```c
+send(sock, buffer, strlen(buffer), 0)
+```
+
+Digunakan untuk mengirim command ke server.
+
+---
+
+## Fungsi recv()
+
+```c
+recv(sock, response, BUFFER_SIZE, 0)
+```
+
+Digunakan untuk menerima response dari server.
+
+---
+
+# Penjelasan Docker
+
+Docker digunakan untuk menjalankan database server di dalam container.
+
+Keuntungan Docker:
+
+- environment konsisten
+- mudah dipindahkan
+- isolasi aplikasi
+
+---
+
+# Penjelasan Dockerfile
+
+## Base Image
+
+```dockerfile
+FROM ubuntu:latest
+```
+
+Menggunakan Ubuntu sebagai base image.
+
+---
+
+## Working Directory
+
+```dockerfile
+WORKDIR /app
+```
+
+Menentukan folder kerja di dalam container.
+
+---
+
+## Copy File
+
+```dockerfile
+COPY . /app
+```
+
+Menyalin seluruh project ke container.
+
+---
+
+## Install GCC
+
+```dockerfile
+RUN apt update && apt install -y gcc make
+```
+
+Menginstall compiler.
+
+---
+
+## Expose Port
+
+```dockerfile
+EXPOSE 9000
+```
+
+Membuka port 9000.
+
+---
+
+## CMD
+
+```dockerfile
+CMD ["./server"]
+```
+
+Menjalankan program server saat container dijalankan.
+
+---
+
+# Cara Menjalankan Program
+
+## Compile FUSE
+
+```bash
+gcc fuse.c -o fuse `pkg-config fuse --cflags --libs`
+```
+
+## Compile Server
+
+```bash
+gcc server.c -o server
+```
+
+## Compile Client
+
+```bash
+gcc client.c -o client
+```
+
+## Jalankan FUSE
+
+```bash
+./fuse -f fuse_mount
+```
+
+## Jalankan Server
+
+```bash
+./server
+```
+
+## Jalankan Client
+
+```bash
+./client
+```
+
+---
+
+# Contoh Command
+
+## Membuat Database
+
+```text
+CREATE DATABASE kampus
+```
+
+## Melihat Database
+
+```text
+LIST DATABASE
+```
+
+## Membuat Table
+
+```text
+CREATE TABLE kampus mahasiswa
+```
+
+## Melihat Table
+
+```text
+LIST TABLE kampus
+```
+
+---
+
+# Hasil Enkripsi
+
+File asli tersimpan pada:
+
+```text
+encrypted_storage/
+```
+
+Contoh:
+
+```text
+mahasiswa.csv.enc
+```
+
+Isi file akan berupa karakter acak karena telah dienkripsi menggunakan XOR.
+
+---
+
+# Kesimpulan
+
+Praktikum ini berhasil mengimplementasikan:
+
+1. Filesystem virtual menggunakan FUSE
+2. Enkripsi otomatis menggunakan XOR
+3. Database sederhana berbasis file CSV
+4. Komunikasi client-server menggunakan TCP socket
+5. Containerisasi menggunakan Docker
+
+Sistem berhasil melakukan:
+
+- pembuatan database
+- pembuatan tabel
+- penyimpanan data terenkripsi
+- komunikasi jaringan melalui socket
