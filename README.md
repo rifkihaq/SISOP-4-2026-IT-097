@@ -1,8 +1,8 @@
 # Praktikum Sistem Operasi - FUSE Filesystem
 ## Modul 4 - Kenz Rescue
 
-### Nama : [NAMA ANDA]
-### NRP  : [NRP ANDA]
+### Nama : Muhammad Salman Rifki Haq
+### NRP  : 5027251097
 
 ---
 
